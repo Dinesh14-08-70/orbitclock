@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Orbit Clock">
+<meta name="theme-color" content="#0b0d12">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%230b0d12'/%3E%3Ccircle cx='90' cy='90' r='70' fill='none' stroke='%23262b36' stroke-width='4'/%3E%3Ccircle cx='90' cy='52' r='14' fill='%23f5b84a'/%3E%3Ccircle cx='135' cy='90' r='12' fill='%235ec8f2'/%3E%3Ccircle cx='60' cy='140' r='10' fill='%23f2677a'/%3E%3C/svg%3E">
+<title>Orbit Clock</title>
+<style>
+  :root { --bg:#0b0d12; --ring:#262b36; --h:#f5b84a; --m:#5ec8f2; --s:#f2677a; --txt:#e9ecf2;
+          --F:min(92vw,58vh); }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; background:var(--bg); color:var(--txt); overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Rounded","Helvetica Neue",sans-serif;
+    -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+  body { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+  /* location picker */
+  #loc { display:flex; flex-direction:column; align-items:center; gap:5px; }
+  #city { appearance:none; -webkit-appearance:none; background:#161a22; color:var(--txt);
+    border:1px solid #2a303c; border-radius:999px; padding:7px 30px 7px 14px; font:inherit; font-size:15px;
+    background-image:linear-gradient(45deg,transparent 50%,#8a92a3 50%),linear-gradient(135deg,#8a92a3 50%,transparent 50%);
+    background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%; background-size:5px 5px; background-repeat:no-repeat; }
+  #locinfo { font-size:12px; color:#6f7787; text-align:center; min-height:1em; }
+
+  /* clock face */
+  #face { position:relative; width:var(--F); height:var(--F); flex:none; }
+  .ring { position:absolute; inset:0; border-radius:50%; border:2px solid var(--ring);
+    background:radial-gradient(circle at 50% 50%, #12151c 0%, #0b0d12 70%); }
+  .below { position:absolute; inset:2px; border-radius:50%;
+    background:linear-gradient(to bottom, transparent 50%, rgba(0,0,0,.32) 50%); }
+  .track { position:absolute; border-radius:50%; border:1px dashed #1c2029; }
+  .hz { position:absolute; left:50%; top:50%; z-index:1; font-size:calc(var(--F)*.028); color:#3a404d; font-weight:600; }
+  .hzTick { position:absolute; left:50%; top:50%; z-index:1; width:calc(var(--F)*.05); height:0; border-top:1px dashed #3a404d; }
+  #locinfo { cursor:pointer; }
+
+  .tag { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:3;
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-variant-numeric:tabular-nums; font-weight:700; line-height:1; will-change:transform; }
+  #hour { width:calc(var(--F)*.141); height:calc(var(--F)*.141); font-size:calc(var(--F)*.067);
+    color:#1a1205; background:var(--h); box-shadow:0 0 20px rgba(245,184,74,.35); }
+  #min  { width:calc(var(--F)*.112); height:calc(var(--F)*.112); font-size:calc(var(--F)*.053);
+    color:#04161e; background:var(--m); box-shadow:0 0 18px rgba(94,200,242,.35); }
+  #sec  { width:calc(var(--F)*.088); height:calc(var(--F)*.088); font-size:calc(var(--F)*.042);
+    color:#2a060c; background:var(--s); box-shadow:0 0 16px rgba(242,103,122,.35); }
+
+  .sky { position:absolute; left:50%; top:50%; width:calc(var(--F)*.044); height:calc(var(--F)*.044);
+    transform:translate(-50%,-50%); z-index:2; transition:opacity .6s; will-change:transform; }
+  .sky.down { opacity:.4; }
+  #sun svg, #moon { width:100%; height:100%; display:block; }
+  #sun { filter:drop-shadow(0 0 5px rgba(255,200,70,.7)); }
+  #moonWrap { filter:drop-shadow(0 0 4px rgba(220,230,255,.45)); }
+
+  #center { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:1;
+    display:flex; flex-direction:column; align-items:center; text-align:center; }
+  #day  { font-size:calc(var(--F)*.039); letter-spacing:.22em; color:#9aa2b2; font-weight:600; }
+  #date { font-size:calc(var(--F)*.05); color:var(--txt); font-weight:600; margin-top:.25em; white-space:nowrap; }
+  #ampm { font-size:calc(var(--F)*.033); letter-spacing:.2em; color:#4a5160; margin-top:.5em; }
+  #mark { position:absolute; left:50%; top:64%; transform:translateX(-50%); z-index:1;
+    font-size:calc(var(--F)*.035); font-style:italic; letter-spacing:.12em; white-space:nowrap;
+    color:#e9ecf2; opacity:.16; pointer-events:none; }
+
+  /* bottom info */
+  #info { text-align:center; display:flex; flex-direction:column; gap:6px; }
+  #events { display:flex; gap:18px; justify-content:center; flex-wrap:wrap; font-size:15px; color:#cfd4dd; }
+  #events b { font-weight:600; }
+  #events .t { font-variant-numeric:tabular-nums; }
+  #events small { color:#7b8394; font-size:12px; }
+  #phase { font-size:13px; color:#8a92a3; }
+  #legend { display:flex; gap:16px; font-size:12px; color:#6f7787; }
+  #legend span::before { content:""; display:inline-block; width:8px; height:8px; border-radius:50%;
+    margin-right:6px; vertical-align:middle; background:var(--c); }
+</style>
+</head>
+<body>
+  <div id="loc">
+    <select id="city" aria-label="Location"></select>
+    <div id="locinfo"></div>
+  </div>
+
+  <div id="face">
+    <div class="ring"></div>
+    <div class="below"></div>
+    <div class="track" id="tH"></div>
+    <div class="track" id="tM"></div>
+    <div class="hz" id="hzE">E</div>
+    <div class="hz" id="hzW">W</div>
+    <div class="hzTick" id="tkE"></div>
+    <div class="hzTick" id="tkW"></div>
+    <div id="center"><div id="day"></div><div id="date"></div><div id="ampm"></div></div>
+    <div id="mark">Design by Param</div>
+    <div class="sky" id="sun"><svg viewBox="0 0 24 24"><g stroke="#ffcf4a" stroke-width="2" stroke-linecap="round">
+      <line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/>
+      <line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/>
+      <line x1="4.6" y1="4.6" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.4" y2="19.4"/>
+      <line x1="4.6" y1="19.4" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.4" y2="4.6"/></g>
+      <circle cx="12" cy="12" r="5.2" fill="#ffcf4a"/></svg></div>
+    <div class="sky" id="moonWrap"><canvas id="moon"></canvas></div>
+    <div class="tag" id="hour">12</div>
+    <div class="tag" id="min">00</div>
+    <div class="tag" id="sec">00</div>
+  </div>
+
+  <div id="info">
+    <div id="events"><span id="sunEv"></span><span id="moonEv"></span></div>
+    <div id="phase"></div>
+  </div>
+  <div id="legend">
+    <span style="--c:var(--h)">Hour</span>
+    <span style="--c:var(--m)">Minute</span>
+    <span style="--c:var(--s)">Second</span>
+  </div>
+
+<script>
+/* ---------------- Cities ---------------- */
+const CITIES = {
+  "Malaysia": [
+    ["Kuala Lumpur",3.139,101.687,"Asia/Kuala_Lumpur"],["Seremban",2.7297,101.9381,"Asia/Kuala_Lumpur"],
+    ["Port Dickson",2.5225,101.7963,"Asia/Kuala_Lumpur"],["Melaka",2.1896,102.2501,"Asia/Kuala_Lumpur"],["Bemban (Melaka)",2.270,102.370,"Asia/Kuala_Lumpur"],
+    ["Johor Bahru",1.4927,103.7414,"Asia/Kuala_Lumpur"],["Ipoh",4.5975,101.0901,"Asia/Kuala_Lumpur"],
+    ["George Town (Penang)",5.4141,100.3288,"Asia/Kuala_Lumpur"],["Alor Setar",6.1248,100.3678,"Asia/Kuala_Lumpur"],
+    ["Kota Bharu",6.1254,102.2381,"Asia/Kuala_Lumpur"],["Kuala Terengganu",5.3296,103.137,"Asia/Kuala_Lumpur"],
+    ["Kuantan",3.8077,103.326,"Asia/Kuala_Lumpur"],["Kota Kinabalu",5.9804,116.0735,"Asia/Kuching"],
+    ["Kuching",1.5535,110.3593,"Asia/Kuching"]],
+  "Asia": [
+    ["Singapore",1.3521,103.8198,"Asia/Singapore"],["Jakarta",-6.2088,106.8456,"Asia/Jakarta"],
+    ["Bangkok",13.7563,100.5018,"Asia/Bangkok"],["Ho Chi Minh City",10.8231,106.6297,"Asia/Ho_Chi_Minh"],
+    ["Manila",14.5995,120.9842,"Asia/Manila"],["Hong Kong",22.3193,114.1694,"Asia/Hong_Kong"],
+    ["Taipei",25.033,121.5654,"Asia/Taipei"],["Shanghai",31.2304,121.4737,"Asia/Shanghai"],
+    ["Beijing",39.9042,116.4074,"Asia/Shanghai"],["Seoul",37.5665,126.978,"Asia/Seoul"],
+    ["Tokyo",35.6762,139.6503,"Asia/Tokyo"],["Chennai",13.0827,80.2707,"Asia/Kolkata"],
+    ["Mumbai",19.076,72.8777,"Asia/Kolkata"],["New Delhi",28.6139,77.209,"Asia/Kolkata"],
+    ["Colombo",6.9271,79.8612,"Asia/Colombo"]],
+  "Middle East & Africa": [
+    ["Dubai",25.2048,55.2708,"Asia/Dubai"],["Istanbul",41.0082,28.9784,"Europe/Istanbul"],
+    ["Cairo",30.0444,31.2357,"Africa/Cairo"],["Nairobi",-1.2921,36.8219,"Africa/Nairobi"],
+    ["Johannesburg",-26.2041,28.0473,"Africa/Johannesburg"]],
+  "Europe": [
+    ["London",51.5074,-0.1278,"Europe/London"],["Paris",48.8566,2.3522,"Europe/Paris"],
+    ["Madrid",40.4168,-3.7038,"Europe/Madrid"],["Rome",41.9028,12.4964,"Europe/Rome"],
+    ["Munich",48.1351,11.582,"Europe/Berlin"],["Berlin",52.52,13.405,"Europe/Berlin"],
+    ["Vienna",48.2082,16.3738,"Europe/Vienna"],["Salzburg",47.8095,13.055,"Europe/Vienna"],
+    ["Prague",50.0755,14.4378,"Europe/Prague"],["Vilnius",54.6872,25.2797,"Europe/Vilnius"],
+    ["Moscow",55.7558,37.6173,"Europe/Moscow"]],
+  "Americas": [
+    ["New York",40.7128,-74.006,"America/New_York"],["Toronto",43.6532,-79.3832,"America/Toronto"],
+    ["Chicago",41.8781,-87.6298,"America/Chicago"],["Los Angeles",34.0522,-118.2437,"America/Los_Angeles"],
+    ["Vancouver",49.2827,-123.1207,"America/Vancouver"],["Mexico City",19.4326,-99.1332,"America/Mexico_City"],
+    ["São Paulo",-23.5505,-46.6333,"America/Sao_Paulo"],["Buenos Aires",-34.6037,-58.3816,"America/Argentina/Buenos_Aires"]],
+  "Oceania": [
+    ["Perth",-31.9505,115.8605,"Australia/Perth"],["Sydney",-33.8688,151.2093,"Australia/Sydney"],
+    ["Melbourne",-37.8136,144.9631,"Australia/Melbourne"],["Auckland",-36.8485,174.7633,"Pacific/Auckland"]]
+};
+const ALL = Object.values(CITIES).flat();
+const byName = n => ALL.find(c => c[0] === n);
+const DEFAULT_CITY = byName("Bemban (Melaka)");
+
+/* ---------------- Astronomy (standard low-precision formulas) ---------------- */
+const rad = Math.PI/180, OBL = rad*23.4397;
+const toDays = ms => ms/86400000 - 0.5 + 2440588 - 2451545;
+function sunCoords(d){
+  const M = rad*(357.5291 + 0.98560028*d);
+  const C = rad*(1.9148*Math.sin(M) + 0.02*Math.sin(2*M) + 0.0003*Math.sin(3*M));
+  const L = M + C + rad*102.9372 + Math.PI;
+  return { ra:Math.atan2(Math.sin(L)*Math.cos(OBL), Math.cos(L)), dec:Math.asin(Math.sin(OBL)*Math.sin(L)) };
+}
+function moonCoords(d){
+  const L = rad*(218.316 + 13.176396*d), M = rad*(134.963 + 13.064993*d), F = rad*(93.272 + 13.229350*d);
+  const l = L + rad*6.289*Math.sin(M), b = rad*5.128*Math.sin(F), dist = 385001 - 20905*Math.cos(M);
+  return { ra:Math.atan2(Math.sin(l)*Math.cos(OBL) - Math.tan(b)*Math.sin(OBL), Math.cos(l)),
+           dec:Math.asin(Math.sin(b)*Math.cos(OBL) + Math.cos(b)*Math.sin(OBL)*Math.sin(l)), dist };
+}
+const wrapPi = a => { a = (a + Math.PI) % (2*Math.PI); if (a < 0) a += 2*Math.PI; return a - Math.PI; };
+const H0 = { sun:-0.833*rad, moon:0.125*rad };   // altitude of the centre at rise/set
+function bodyState(ms, lat, lng, body){
+  const d = toDays(ms), c = body === 'sun' ? sunCoords(d) : moonCoords(d), p = rad*lat;
+  const H = wrapPi(rad*(280.16 + 360.9856235*d) + rad*lng - c.ra);   // local hour angle, + = west
+  const alt = Math.asin(Math.sin(p)*Math.sin(c.dec) + Math.cos(p)*Math.cos(c.dec)*Math.cos(H));
+  return { H, alt, dec:c.dec };
+}
+/* Dial angle (degrees clockwise from 12): overhead/meridian = 12, rising = 9 (east), setting = 3 (west) */
+function dialAngle(st, lat, h0){
+  const p = rad*lat;
+  const cosH0 = (Math.sin(h0) - Math.sin(p)*Math.sin(st.dec)) / (Math.cos(p)*Math.cos(st.dec));
+  const Hs = cosH0 >= 1 ? 0 : cosH0 <= -1 ? Math.PI : Math.acos(cosH0);   // half the time above horizon
+  const a = Math.abs(st.H), s = st.H < 0 ? -1 : 1;
+  const deg = a <= Hs ? (Hs > 0 ? a/Hs*90 : 0) : 90 + (a - Hs)/(Math.PI - Hs)*90;
+  return s*deg;
+}
+function moonIllum(ms){
+  const d = toDays(ms), s = sunCoords(d), m = moonCoords(d), sdist = 149598000;
+  const phi = Math.acos(Math.sin(s.dec)*Math.sin(m.dec) + Math.cos(s.dec)*Math.cos(m.dec)*Math.cos(s.ra - m.ra));
+  const inc = Math.atan2(sdist*Math.sin(phi), m.dist - sdist*Math.cos(phi));
+  const ang = Math.atan2(Math.cos(s.dec)*Math.sin(s.ra - m.ra),
+              Math.sin(s.dec)*Math.cos(m.dec) - Math.cos(s.dec)*Math.sin(m.dec)*Math.cos(s.ra - m.ra));
+  return { fraction:(1 + Math.cos(inc))/2, phase:0.5 + 0.5*inc*(ang < 0 ? -1 : 1)/Math.PI };
+}
+function phaseName(p){
+  if (p < 0.03 || p > 0.97) return "New Moon";
+  if (p < 0.22) return "Waxing Crescent";
+  if (p < 0.28) return "First Quarter";
+  if (p < 0.47) return "Waxing Gibbous";
+  if (p < 0.53) return "Full Moon";
+  if (p < 0.72) return "Waning Gibbous";
+  if (p < 0.78) return "Last Quarter";
+  return "Waning Crescent";
+}
+/* Next rise or set within ~36 h, whichever comes first */
+function nextEvent(ms, lat, lng, body){
+  const h0 = H0[body], f = t => bodyState(t, lat, lng, body).alt - h0, step = 10*60000;
+  let t0 = ms, f0 = f(t0);
+  for (let i = 1; i <= 216; i++){
+    const t1 = ms + i*step, f1 = f(t1);
+    if ((f0 < 0) !== (f1 < 0)){
+      let a = t0, b = t1, fa = f0;
+      for (let k = 0; k < 22; k++){ const mid = (a+b)/2, fm = f(mid); if ((fa < 0) === (fm < 0)){ a = mid; fa = fm; } else b = mid; }
+      return { type: f0 < 0 ? 'rise' : 'set', time: (a+b)/2 };
+    }
+    t0 = t1; f0 = f1;
+  }
+  return { type: f0 < 0 ? 'down' : 'up' };
+}
+
+/* ---------------- Location state ---------------- */
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem('orbit.'+k)); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem('orbit.'+k, JSON.stringify(v)); } catch(e){} }
+};
+const loc = { mode:'gps', name:'', lat:DEFAULT_CITY[1], lng:DEFAULT_CITY[2], tz:undefined, gpsOk:false };
+let tzOffset = 0;   // ms to add to UTC to get the location's wall-clock time
+
+function computeOffset(){
+  const now = new Date(Math.floor(Date.now()/1000)*1000);
+  if (!loc.tz){ tzOffset = -now.getTimezoneOffset()*60000; return; }
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone:loc.tz, hourCycle:'h23', year:'numeric', month:'2-digit',
+      day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' }).formatToParts(now);
+    const g = t => +parts.find(x => x.type === t).value;
+    tzOffset = Date.UTC(g('year'), g('month')-1, g('day'), g('hour') % 24, g('minute'), g('second')) - now.getTime();
+  } catch(e){ tzOffset = -now.getTimezoneOffset()*60000; }
+}
+function gmtLabel(){
+  const m = Math.round(tzOffset/60000), sign = m >= 0 ? '+' : '−', a = Math.abs(m);
+  return 'GMT' + sign + Math.floor(a/60) + (a % 60 ? ':' + String(a % 60).padStart(2,'0') : '');
+}
+function nearestCity(lat, lng){
+  let best = null, bd = Infinity;
+  for (const c of ALL){
+    const dLat = rad*(c[1]-lat), dLng = rad*(c[2]-lng);
+    const h = Math.sin(dLat/2)**2 + Math.cos(rad*lat)*Math.cos(rad*c[1])*Math.sin(dLng/2)**2;
+    const km = 12742*Math.asin(Math.sqrt(h));
+    if (km < bd){ bd = km; best = c; }
+  }
+  return { city:best, km:bd };
+}
+const fmtCoord = (lat,lng) => Math.abs(lat).toFixed(2) + '°' + (lat >= 0 ? 'N' : 'S') + ' ' + Math.abs(lng).toFixed(2) + '°' + (lng >= 0 ? 'E' : 'W');
+const locinfo = document.getElementById('locinfo');
+function describeLocation(msg){
+  if (loc.mode === 'city'){ locinfo.textContent = 'Local time in ' + loc.name + ' · ' + gmtLabel(); return; }
+  if (msg){ locinfo.textContent = msg; return; }
+  const n = nearestCity(loc.lat, loc.lng);
+  locinfo.textContent = (n.km < 40 ? 'Near ' + n.city[0] + ' · ' : '') + fmtCoord(loc.lat, loc.lng);
+}
+
+function requestGPS(){
+  if (loc.mode !== 'gps') return;
+  if (!navigator.geolocation){ gpsFailed(); return; }
+  if (!loc.gpsOk) locinfo.textContent = 'Finding your location…';
+  navigator.geolocation.getCurrentPosition(pos => {
+    if (loc.mode !== 'gps') return;
+    loc.lat = pos.coords.latitude; loc.lng = pos.coords.longitude; loc.gpsOk = true;
+    store.set('gps', [loc.lat, loc.lng]);
+    refreshAll(); describeLocation();
+  }, gpsFailed, { enableHighAccuracy:false, timeout:15000, maximumAge:5*60000 });
+}
+function gpsFailed(){
+  if (loc.mode !== 'gps') return;
+  const saved = store.get('gps');
+  if (saved){ loc.lat = saved[0]; loc.lng = saved[1]; refreshAll();
+    describeLocation('Using last known location · ' + fmtCoord(loc.lat, loc.lng)); }
+  else { loc.lat = DEFAULT_CITY[1]; loc.lng = DEFAULT_CITY[2]; refreshAll();
+    describeLocation('Location is off — showing Bemban, Melaka. Tap here to retry, or pick a city.'); }
+}
+
+function selectLocation(value){
+  store.set('sel', value);
+  if (value === 'gps'){
+    loc.mode = 'gps'; loc.tz = undefined; loc.name = '';
+    const saved = store.get('gps'); if (saved){ loc.lat = saved[0]; loc.lng = saved[1]; }
+    refreshAll(); describeLocation(saved ? null : 'Finding your location…'); requestGPS();
+  } else {
+    const c = byName(value) || DEFAULT_CITY;
+    loc.mode = 'city'; loc.name = c[0]; loc.lat = c[1]; loc.lng = c[2]; loc.tz = c[3];
+    refreshAll(); describeLocation();
+  }
+}
+
+/* Build the picker */
+const sel = document.getElementById('city');
+sel.add(new Option('📍 My location', 'gps'));
+for (const [group, list] of Object.entries(CITIES)){
+  const og = document.createElement('optgroup'); og.label = group;
+  for (const c of list) og.appendChild(new Option(c[0], c[0]));
+  sel.appendChild(og);
+}
+sel.addEventListener('change', () => selectLocation(sel.value));
+locinfo.addEventListener('click', () => { if (loc.mode === 'gps'){ locinfo.textContent = 'Checking location…'; requestGPS(); } });
+try { navigator.geolocation.watchPosition(pos => {
+  if (loc.mode !== 'gps') return;
+  const moved = Math.abs(pos.coords.latitude - loc.lat) + Math.abs(pos.coords.longitude - loc.lng) > 0.005;
+  loc.lat = pos.coords.latitude; loc.lng = pos.coords.longitude; loc.gpsOk = true;
+  store.set('gps', [loc.lat, loc.lng]);
+  if (moved){ refreshAll(); describeLocation(); }
+}, () => {}, { enableHighAccuracy:false, timeout:20000, maximumAge:5*60000 }); } catch(e){}
+
+/* ---------------- Drawing ---------------- */
+const face = document.getElementById('face');
+const H = document.getElementById('hour'), M = document.getElementById('min'), S = document.getElementById('sec');
+const sunEl = document.getElementById('sun'), moonWrap = document.getElementById('moonWrap'), moonCv = document.getElementById('moon');
+const ampm = document.getElementById('ampm'), dayEl = document.getElementById('day'), dateEl = document.getElementById('date');
+const DAYS = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const pad = n => String(n).padStart(2,'0');
+const R = { h:0.42, m:0.63, s:0.84, sky:0.925 };
+
+function sizeTracks(){
+  const r = face.clientWidth/2;
+  for (const [id,f] of [['tH',R.h],['tM',R.m]]){
+    const el = document.getElementById(id), d = 2*r*f;
+    el.style.width = el.style.height = d+'px';
+    el.style.left = el.style.top = (r - d/2)+'px';
+  }
+  place(document.getElementById('hzE'), -90, 0.86); place(document.getElementById('hzW'), 90, 0.86);
+  place(document.getElementById('tkE'), -90, 0.94); place(document.getElementById('tkW'), 90, 0.94);
+}
+function place(el, deg, frac){
+  const r = face.clientWidth/2 * frac, a = (deg-90)*rad;
+  el.style.transform = `translate(calc(-50% + ${r*Math.cos(a)}px), calc(-50% + ${r*Math.sin(a)}px))`;
+}
+function drawMoon(phase, southern){
+  const css = moonCv.clientWidth || 16, dpr = window.devicePixelRatio || 1, n = Math.round(css*dpr);
+  if (moonCv.width !== n){ moonCv.width = moonCv.height = n; }
+  const ctx = moonCv.getContext('2d'), r = n/2 - dpr*0.5, c = n/2;
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,n,n);
+  if (southern){ ctx.translate(n,0); ctx.scale(-1,1); }
+  ctx.fillStyle = '#2b303b'; ctx.beginPath(); ctx.arc(c,c,r,0,2*Math.PI); ctx.fill();
+  const waxing = phase < 0.5, k = Math.cos(2*Math.PI*phase), rx = r*Math.abs(k);
+  ctx.fillStyle = '#eef1f7'; ctx.beginPath();
+  if (waxing){
+    ctx.arc(c,c,r,-Math.PI/2,Math.PI/2,false);
+    ctx.ellipse(c,c,rx,r,0,Math.PI/2,-Math.PI/2, k > 0);
+  } else {
+    ctx.arc(c,c,r,-Math.PI/2,Math.PI/2,true);
+    ctx.ellipse(c,c,rx,r,0,Math.PI/2,k > 0 ? 3*Math.PI/2 : -Math.PI/2, k <= 0);
+  }
+  ctx.fill();
+}
+
+let illum = { fraction:0, phase:0 };
+function updateSky(){
+  const now = Date.now();
+  const s = bodyState(now, loc.lat, loc.lng, 'sun'), m = bodyState(now, loc.lat, loc.lng, 'moon');
+  place(sunEl, dialAngle(s, loc.lat, H0.sun), R.sky);
+  place(moonWrap, dialAngle(m, loc.lat, H0.moon), R.sky);
+  sunEl.classList.toggle('down', s.alt < H0.sun);
+  moonWrap.classList.toggle('down', m.alt < H0.moon);
+  illum = moonIllum(now);
+  drawMoon(illum.phase, loc.lat < 0);
+  document.getElementById('phase').textContent =
+    phaseName(illum.phase) + ' · ' + Math.round(illum.fraction*100) + '% illuminated';
+}
+function fmtTime(ms){
+  const opt = { hour:'numeric', minute:'2-digit' }; if (loc.tz) opt.timeZone = loc.tz;
+  return new Date(ms).toLocaleTimeString('en-US', opt);
+}
+function dayKey(ms){ const z = new Date(ms + tzOffset); return z.getUTCFullYear()*400 + z.getUTCMonth()*32 + z.getUTCDate(); }
+function eventHTML(icon, body, ev){
+  const word = body === 'sun' ? 'Sun' : 'Moon';
+  if (ev.type === 'up')   return `${icon} <b>${word} up all day</b>`;
+  if (ev.type === 'down') return `${icon} <b>${word} down all day</b>`;
+  const label = word + ev.type;   // Sunrise / Sunset / Moonrise / Moonset
+  const tmrw = dayKey(ev.time) !== dayKey(Date.now()) ? ' <small>tomorrow</small>' : '';
+  return `${icon} <b>${label}</b> <span class="t">${fmtTime(ev.time)}</span>${tmrw}`;
+}
+function updateEvents(){
+  const now = Date.now();
+  document.getElementById('sunEv').innerHTML  = eventHTML('☀️', 'sun',  nextEvent(now, loc.lat, loc.lng, 'sun'));
+  document.getElementById('moonEv').innerHTML = eventHTML('🌙', 'moon', nextEvent(now, loc.lat, loc.lng, 'moon'));
+}
+function refreshAll(){ computeOffset(); updateSky(); updateEvents(); }
+
+function tick(){
+  const now = new Date(), z = new Date(now.getTime() + tzOffset);
+  const ms = now.getMilliseconds(), s = z.getUTCSeconds(), m = z.getUTCMinutes(), h = z.getUTCHours();
+  const secF = s + ms/1000, minF = m + secF/60, hrF = (h % 12) + minF/60;
+  place(S, secF*6, R.s); place(M, minF*6, R.m); place(H, hrF*30, R.h);
+  S.textContent = pad(s); M.textContent = pad(m); H.textContent = (h % 12) || 12;
+  ampm.textContent = h < 12 ? 'AM' : 'PM';
+  dayEl.textContent = DAYS[z.getUTCDay()];
+  dateEl.textContent = z.getUTCDate() + ' ' + MONTHS[z.getUTCMonth()] + ' ' + z.getUTCFullYear();
+  requestAnimationFrame(tick);
+}
+
+/* ---------------- Start ---------------- */
+sizeTracks();
+addEventListener('resize', () => { sizeTracks(); updateSky(); });
+const saved = store.get('sel') || 'gps';
+sel.value = (saved === 'gps' || byName(saved)) ? saved : 'gps';
+selectLocation(sel.value);
+setInterval(updateSky, 5000);                       // sun & moon move slowly
+setInterval(() => { computeOffset(); updateEvents(); if (loc.mode === 'city') describeLocation(); }, 60000);
+setInterval(requestGPS, 10*60000);                  // re-check location every 10 min
+document.addEventListener('visibilitychange', () => { if (!document.hidden){ refreshAll(); requestGPS(); } });
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
